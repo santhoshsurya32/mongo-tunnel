@@ -24,3 +24,41 @@ app.get('/ping', async (req, res) => {
 app.listen(port, () => {
   console.log(`Mongo tunnel server listening on port ${port}`);
 });
+
+app.use(express.json());
+
+app.post('/query', async (req, res) => {
+  const { dbName, collectionName, operation, query = {}, data = {} } = req.body;
+
+  try {
+    await client.connect();
+    const db = client.db(dbName);
+    const collection = db.collection(collectionName);
+
+    let result;
+
+    switch (operation) {
+      case 'find':
+        result = await collection.find(query).toArray();
+        break;
+      case 'insertOne':
+        result = await collection.insertOne(data);
+        break;
+      case 'updateOne':
+        result = await collection.updateOne(query, { $set: data });
+        break;
+      case 'deleteOne':
+        result = await collection.deleteOne(query);
+        break;
+      default:
+        return res.status(400).send('Unsupported operation');
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('Mongo tunnel error:', err);
+    res.status(500).send('Mongo tunnel error');
+  } finally {
+    await client.close();
+  }
+});
